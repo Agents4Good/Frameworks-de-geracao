@@ -1,0 +1,7 @@
+site_name: 'Título da Aplicação'
+
+nav:
+  - Home: index.md
+
+plugins:
+  - techdocs-core
