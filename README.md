@@ -1,4 +1,4 @@
-<h1 align="center">OpenHands Documentação</h1>
+<h1 align="center">OpenHands</h1>
 
 > Este repositório busca documentar a arquitetura e os usos do OpenHands para a criação de um gerador de aplicações. Além disso, estão armazenados os microagentes e exemplos úteis para o aprimoramento do OpenHands, visando o objetivo citado.
 
