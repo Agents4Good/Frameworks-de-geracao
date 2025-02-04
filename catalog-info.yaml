@@ -11,4 +11,4 @@ metadata:
 spec:
     type: service
     lifecycle: development
-    owner: Geração
+    owner: Geracao
