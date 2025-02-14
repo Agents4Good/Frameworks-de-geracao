@@ -2,6 +2,7 @@ site_name: 'OpenHands Documentação'
 
 nav:
   - Home: README.md
+  - Guia: guias/guia_de_instalacao.md
 
 plugins:
   - techdocs-core
