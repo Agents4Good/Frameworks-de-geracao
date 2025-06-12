@@ -9,6 +9,6 @@ metadata:
         github.com/project-slug: Agents4Good/OpenHands
 
 spec:
-    type: service
+    type: documentation
     lifecycle: development
     owner: Geracao
