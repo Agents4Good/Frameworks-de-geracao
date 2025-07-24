@@ -140,56 +140,65 @@ class LLMAgent:
         """Registra ferramentas padrão"""
         self.mcp_server.register_tool(registerAgent())
     
-    async def process_message(self, user_input: str) -> str:
-        """Processa mensagem do usuário"""
+    async def process_message(self, user_input: str) -> Dict[str, Any]:
+        """Processa mensagem do usuário e retorna resposta + tool calls"""
         try:
             # Adicionar mensagem do usuário ao histórico
             self.conversation_history.append({
                 "role": "user",
                 "content": user_input
             })
-            
+
             # Preparar mensagem para o LLM com informações sobre ferramentas
             system_message = self._build_system_message()
-            
+
             messages = [
                 {"role": "system", "content": system_message},
                 *self.conversation_history[-10:]  # Últimas 10 mensagens
             ]
-            
+
             # Primeira chamada ao LLM
             response = await self._call_llm(messages)
-            
-            # Verificar se o LLM quer usar ferramentas
+            # Extrair tool calls da resposta inicial
             tool_calls = self._extract_tool_calls(response)
-            
+
+            tool_results = []
             if tool_calls:
                 # Executar ferramentas solicitadas
                 tool_results = await self._execute_tool_calls(tool_calls)
-                
+
                 # Adicionar resultados ao contexto e fazer nova chamada
                 messages.append({"role": "assistant", "content": response})
                 messages.append({
                     "role": "user", 
                     "content": f"Resultados das ferramentas: {json.dumps(tool_results, indent=2)}"
                 })
-                
+
                 final_response = await self._call_llm(messages)
             else:
                 final_response = response
-            
+
             # Adicionar resposta ao histórico
             self.conversation_history.append({
                 "role": "assistant",
                 "content": final_response
             })
-            
-            return final_response
-            
+
+            # Retornar resposta + tool calls executadas
+            return {
+                "response": final_response,
+                "tool_calls": tool_calls,
+                "tool_results": tool_results
+            }
+
         except Exception as e:
             logger.error(f"Erro ao processar mensagem: {e}")
-            return f"Desculpe, ocorreu um erro: {str(e)}"
-    
+            return {
+                "response": f"Desculpe, ocorreu um erro: {str(e)}",
+                "tool_calls": [],
+                "tool_results": []
+            }
+
     def _build_system_message(self) -> str:
         """Constrói mensagem de sistema com informações sobre ferramentas"""
         tools_info = self.mcp_server.list_tools()
@@ -203,7 +212,7 @@ class LLMAgent:
         Você é um desenvolvedor sênior especializado em agentes de inteligência artificial, com mais de 15 anos de experiência.
         Sua responsabilidade é projetar e gerar o código completo de um novo agente de IA, com base nas instruções fornecidas pelo usuário.
 
-        Se o usuário pedir para um agente ser gerado, é preciso salvar o código do agente utilizando a ferramenta registerAgent, pra isso, faça a TOOL_CALL invocando a ferramenta.
+        Se o usuário pedir para um agente ser gerado, é preciso salvar o código do agente utilizando a ferramenta (tool_call) registerAgent, pra isso, faça a TOOL_CALL respondendo no formato da ferramenta.
 
         Um agente deve conter:
         1. Definição clara do seu papel (`system_prompt`): descrição da persona e tarefas do agente, com exemplos ou passo a passo.
@@ -251,28 +260,46 @@ class LLMAgent:
     def _extract_tool_calls(self, response: str) -> List[Dict]:
         """Extrai chamadas de ferramentas da resposta do LLM"""
         tool_calls = []
-        lines = response.split('\n')
-        
+        lines = response.strip().split('\n')
+
         i = 0
         while i < len(lines):
-            if lines[i].startswith("TOOL_CALL:"):
+            if lines[i].strip().startswith("TOOL_CALL:"):
                 tool_name = lines[i].replace("TOOL_CALL:", "").strip()
-                if i + 1 < len(lines) and lines[i + 1].startswith("PARAMS:"):
-                    try:
-                        params_str = lines[i + 1].replace("PARAMS:", "").strip()
-                        params = json.loads(params_str)
-                        tool_calls.append({
-                            "tool": tool_name,
-                            "params": params
-                        })
-                    except json.JSONDecodeError:
-                        logger.error(f"Erro ao parsear parâmetros: {params_str}")
-                i += 2
+                params_lines = []
+                i += 1
+
+                # Coleta todas as linhas seguintes até a próxima TOOL_CALL ou fim
+                while i < len(lines) and not lines[i].strip().startswith("TOOL_CALL:"):
+                    if lines[i].strip().startswith("PARAMS:"):
+                        params_lines.append(lines[i].replace("PARAMS:", "").strip())
+                    else:
+                        params_lines.append(lines[i].strip())
+                    i += 1
+
+                params_str = "\n".join(params_lines)
+
+                try:
+                    params = json.loads(params_str)
+
+                    # Ignora chamadas com código vazio
+                    if tool_name == "registerAgent" and not params.get("code", "").strip():
+                        logger.warning(f"Ignorando chamada para 'registerAgent' com código vazio.")
+                        continue
+
+                    tool_calls.append({
+                        "tool": tool_name,
+                        "params": params
+                    })
+                except json.JSONDecodeError as e:
+                    logger.error(f"Erro ao parsear parâmetros para '{tool_name}':\n{params_str}\n{e}")
+
             else:
                 i += 1
-        
+
         return tool_calls
-    
+
+
     async def _execute_tool_calls(self, tool_calls: List[Dict]) -> List[Dict]:
         """Executa chamadas de ferramentas"""
         results = []
@@ -294,7 +321,8 @@ class LLMAgent:
 # Exemplo de uso
 async def main():
     # Configure sua chave da API OpenAI
-    API_KEY = "sua-chave-openai-aqui"
+    API_KEY = ""  # Substitua pela sua chave real
+    
     if API_KEY == "sua-chave-openai-aqui":
         print("⚠️  Por favor, configure sua chave da API OpenAI")
         return
@@ -320,7 +348,8 @@ async def main():
             
             # Processar mensagem
             response = await agent.process_message(user_input)
-            print(f"Agente: {response}\n")
+            print(f"Agente: {response['response']}\n")
+            print(f"Ferramentas chamadas: {response['tool_calls']}\n")
             
         except KeyboardInterrupt:
             print("\nAgente: Até logo! 👋")

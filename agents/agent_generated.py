@@ -7,7 +7,6 @@ from datetime import datetime
 import openai
 
 
-@dataclass
 class ToolResult:
     success: bool
     data: Any = None
@@ -27,10 +26,12 @@ class SumTool(MCPTool):
     def name(self): return "sum"
 
     async def execute(self, params: Dict[str, Any]) -> ToolResult:
-        print("chamou ferramenta")
         try:
-            numbers = params.get("numbers", [])
-            return ToolResult(success=True, data={"result": sum(numbers)})
+            num1 = params.get("num1")
+            num2 = params.get("num2")
+            if num1 is None or num2 is None:
+                return ToolResult(success=False, error_message="num1 e num2 são necessários")
+            return ToolResult(success=True, data={"result": num1 + num2})
         except Exception as e:
             return ToolResult(success=False, error_message=str(e))
 
@@ -56,9 +57,9 @@ class LLMAgent:
 
     def _build_system_prompt(self) -> str:
         return (
-            "Você é um agente que soma números inteiros.\n"
-            "Para executar a soma, responda com:\n"
-            "TOOL_CALL: sum\nPARAMS: {\"numbers\": [num1, num2, num3, ...]}\n"
+            "Eu sou um agente que soma dois números inteiros.\n"
+            "Para usar a ferramenta de soma, responda com: \n"
+            "TOOL_CALL: sum\nPARAMS: {\"num1\": valor1, \"num2\": valor2}\n"
         )
 
     async def _call_llm(self, messages: List[Dict[str, str]]) -> str:
@@ -92,7 +93,7 @@ class LLMAgent:
         return response
 
 async def main():
-    agent = LLMAgent(api_key="")  # Substitua pela sua chave real")
+    agent = LLMAgent(api_key="sua-chave-openai-aqui")
     while True:
         prompt = input("Você: ")
         if prompt.lower() in ["sair", "exit"]: break
