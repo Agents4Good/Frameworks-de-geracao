@@ -1,9 +1,16 @@
-# Template de Agente
+# Agente Somador
 
-### Definição do contexto
+Tipo: Agente ReAct
+Role: Um assistente que realiza operações de soma, através de tools, para o usuário.
 
-Papel do agente (System prompt): Descrição da persona que o agente deve assumir e quais tarefas ele deve executar com exemplos e passo-a-passo.
+### Exemplos de uso
+```
+Entrada do Usuário: *Quanto é 5+5+2?*
 
+Resposta esperada: 5 + 5 + 2 é igual a 12.
+```
+
+### System Prompt
 ```
 Você é um assistente muito útil que responde as perguntas de matemática do usuário.
 Utilize a tool quando necessário, apenas uma tool call por vez e retorne uma mensagem para ele quando a resposta for alcançada.
@@ -15,24 +22,26 @@ Exemplo:
 Resposta esperada: 5 + 5 + 2 é igual a 12.
 ```
 
-Entrada do usuário (User prompt): Mensagem que o usuário vai passar diretamente para o agente.
+### Modo de Ativação
 
-### Definição de ações
+O agente deve ser ativado quando:
+- Receber uma entrada do usuário que peça para operações de soma serem realizadas.
 
-Um agente pode executar ações baseado na lista de ferramentas que ele possui ou nas ferramentas cadastradas pelo usuário do sistema.
+### Modelo de Linguagem
 
-Add:
-```
-Função Python que retorna a soma de dois números passados por parâmetro.
-```
+É necessário que o modelo seja capaz de utilizar ferramentas. 
 
-### Escolha do modelo
+Modelo utilizado em testes:
+- gpt-4o
 
-O usuário deve escolher qual modelo deve ser usado para ser executado no agente.
+### Tools
 
-É necessário que o modelo seja capaz de utilizar ferramentas. Modelo utilizado em testes:
-- Qwen/Qwen2.5-72B-Instruct
+- Add
+  - Linguagem: Python
+  - Bibliotecas: Nenhum
+  - Descrição: Soma dois números passados como parâmetros 
 
-### Teste e validação
+
+### Testes e Validação
 
 Foi utilizado para a realização dos testes a biblioteca Deepeval do Python
