@@ -6,7 +6,7 @@ from google.adk.models.lite_llm import LiteLlm # For multi-model support
 from google.adk.sessions import InMemorySessionService
 from google.adk.runners import Runner
 from google.genai import types
-from .adk_tools import adk_tavily_tool, get_curriculum_vitae
+from adk_tools import adk_tavily_tool, get_curriculum_vitae
 
 load_dotenv(override=True)
 
@@ -28,6 +28,7 @@ job_searcher_agent = Agent(
     name="job_searcher_agent",
     model=model,
     description="Searches a job for the user based on your curriculum vitae and preferences. (using meta-llama/Llama-3.3-70B-Instruct)",
+
     instruction="You are a job searcher agent. Your task is to search for a job for the user based on their curriculum vitae and preferences."
                 "You will receive a curriculum vitae and preferences from the user, and you will search for a job that matches their profile using tools for web searching."
                 "You should analyze the curriculum vitae and preferences to understand the user's skills, experience, and job preferences to use in searching."
@@ -54,8 +55,6 @@ async def call_agent_async(query):
             print("Agent response:", final_response)
 
 if __name__ == "__main__":
-    # api_key=os.getenv("DEEPINFRA_API_KEY"),
-    # base_url=os.getenv("DEEPINFRA_BASE_URL"),
-    # model=os.getenv("DEEPINFRA_MODEL")
-    # print(api_key, base_url, model)
     asyncio.run(call_agent_async(input("Enter your query: ")))
+
+    # procure vagas de emprego para mim, de preferencia presencialmente perto da minha casa. Caminho para o currículo "evals/google_adk/Currículo_oficina.md"
