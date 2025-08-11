@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 from pathlib import Path
+from typing import TypedDict
 
 
 load_dotenv(override=True)
@@ -40,7 +41,7 @@ model = LiteLlm(
     model=os.getenv("OPENAI_MODEL")
 )
 
-{agent_variable} = {agent_variable}(
+root_agent = Agent(
     name="{agent_name}",
     model=model,
     description="{description}",
@@ -50,11 +51,10 @@ model = LiteLlm(
 )
 
 '''
-def criar_agente(agent_variable: str, agent_name: str, description: str, prompt: str, tools_name: list) -> str:
+def criar_agente(agent_name: str, description: str, prompt: str, tools_name: list) -> str:
     """
     Cria e salva um agente em um arquivo .py
 
-    :param agent_variable: Variável que será usada para instanciar o agente
     :param agent_name: Nome do agente que será criado
     :param description: Descrição do agente que será criado
     :param prompt: Prompt do agente que será gerado
@@ -65,7 +65,6 @@ def criar_agente(agent_variable: str, agent_name: str, description: str, prompt:
     tools_list = ", ".join(tools_name)
     
     agent = AGENT_TEMPLATE.format(
-        agent_variable=agent_variable,
         agent_name=agent_name,
         description=description,
         prompt=prompt,
@@ -77,8 +76,6 @@ def criar_agente(agent_variable: str, agent_name: str, description: str, prompt:
 
     with open(AGENT_PATH, 'w', encoding='utf-8') as file:
         file.write(agent)
-
-    _criar_main(agent_variable)
 
     return f"O agente {agent_name} foi criado com as seguintes ferramentas {tools_list}"
 
@@ -94,12 +91,18 @@ def {tool_name}({params}):
     {code}
 '''
 
-def criar_tool(tool_name: str, params: list[tuple], description: str, code: str, return_doc: str) -> str:
+class ParamSpec(TypedDict):
+    name: str
+    type_: str
+    description: str
+
+
+def criar_tool(tool_name: str, params: list[ParamSpec ], description: str, code: str, return_doc: str) -> str:
     """
     Gera uma tool no formato do Google ADK com base nas informações fornecidas.
 
     :param tool_name: Nome da função/tool.
-    :param params: Lista de tuplas no formato (nome, tipo, descrição).
+    :param params: Lista de Objetos ParamSpec no formato: 
     :param description: Descrição geral da função/tool.
     :param code: Código da função/tool em Python.
     :param return_doc: Documentação do retorno da função/tool.
@@ -107,8 +110,8 @@ def criar_tool(tool_name: str, params: list[tuple], description: str, code: str,
     :return: String com a definição da função/tool.
     """
 
-    params_str = ", ".join([f"{name}: {type_}" for name, type_, _ in params])
-    params_doc = "\n    ".join([f":param {name}: {desc}" for name, _, desc in params])
+    params_str = ", ".join([f"{p['name']}: {p['type_']}" for p in params])
+    params_doc = "\n    ".join([f":param {p['name']}: {p['desc']}" for p in params])
 
     tool_code = TOOL_TEMPLATE.format(
         tool_name=tool_name,
@@ -170,7 +173,7 @@ Modelo utilizado em testes:
 Foi utilizado para a realização de testes a biblioteca Deepeval do Python
 """
 
-def criar_documentacao(role: str, example: str, activation_mode: str, tools_description: list) -> str:
+def criar_documentacao(role: str, example: str, activation_mode: str, tools_description: list[str]) -> str:
     """
     Gera uma documentação estruturada para um agente.
 
@@ -197,14 +200,3 @@ def criar_documentacao(role: str, example: str, activation_mode: str, tools_desc
         f.write(documentation_code)
 
     return f"A documentação do agente {agent_name} foi criada com sucesso."
-
-MAIN_TEMPLATE = """
-
-"""
-
-
-
-def _criar_main(agent_name: str) -> None:
-    main_code = MAIN_TEMPLATE.format(agent_name=agent_name)
-    with open(MAIN_PATH, "w", encoding="utf-8") as f:
-        f.write(main_code)

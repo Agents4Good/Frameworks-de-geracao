@@ -1,7 +1,12 @@
-from .agent import agent_creator
+from .agent import root_agent
 from .prompts import AGENT_CREATOR_PROMPT
+from .tools.tools import (
+    criar_agente,
+    criar_documentacao,
+    criar_tool
+    )
 
 __all__ = (
-    "agent_creator",
+    "root_agent",
     "AGENT_CREATOR_PROMPT",
 )
