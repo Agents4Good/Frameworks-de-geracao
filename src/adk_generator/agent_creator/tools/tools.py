@@ -12,11 +12,15 @@ GENERATED_PATH.mkdir(parents=True, exist_ok=True)
 
 AGENT_DIR = GENERATED_PATH / "agent"
 AGENT_DIR.mkdir(parents=True, exist_ok=True)
+TOOLS_DIR = AGENT_DIR / "tools"
+TOOLS_DIR.mkdir(parents=True, exist_ok=True)
 
 AGENT_PATH = AGENT_DIR / "agent.py"
-TOOLS_PATH = AGENT_DIR / "tools.py"
+INIT_AGENT_PATH = GENERATED_PATH / "__init__.py"
+TOOLS_PATH = TOOLS_DIR /"tools.py"
+INIT_TOOLS_PATH = TOOLS_DIR / "__init__.py"
 DOCUMENTATION_PATH = AGENT_DIR / "documentation.md"
-MAIN_PATH = GENERATED_PATH / "main.py"
+
 
 AGENT_CACHE = {
     "name": "",
@@ -32,7 +36,7 @@ from google.adk.models.lite_llm import LiteLlm # For multi-model support
 from google.adk.sessions import InMemorySessionService
 from google.adk.runners import Runner
 from google.genai import types
-from tools import {tools}
+from .tools.tools import {tools}
 
 load_dotenv(override=True)
 
@@ -51,18 +55,32 @@ root_agent = Agent(
 )
 
 '''
-def criar_agente(agent_name: str, description: str, prompt: str, tools_name: list) -> str:
+
+INIT_AGENT_TEMPLATE ='''
+from .agent import {agent_name}
+
+__all__ = ("{agent_name}")
+'''
+
+INIT_TOOLS_TEMPLATE='''
+from .tools import {tool_names}
+
+__all__ = ({export_tools})
+'''
+def criar_agente(agent_name: str, description: str, prompt: str, tools_name: dict) -> str:
     """
     Cria e salva um agente em um arquivo .py
 
     :param agent_name: Nome do agente que será criado
     :param description: Descrição do agente que será criado
     :param prompt: Prompt do agente que será gerado
-    :param tools_name: Lista de nomes das tools que serão usadas pelo agente gerado
-
+    :param tools_name: Dicionário python contendo uma lista de nomes para as tools seguindo  estrutura:
+            {tools_name: ["name1", "name2"]}
     :return: String com o nome do agente e as tools que ele utiliza
     """
-    tools_list = ", ".join(tools_name)
+
+    tools_list = ", ".join(name for name in tools_name)
+    export_tools = ", ".join(f'"{name}"' for name in tools_name)
     
     agent = AGENT_TEMPLATE.format(
         agent_name=agent_name,
@@ -71,15 +89,30 @@ def criar_agente(agent_name: str, description: str, prompt: str, tools_name: lis
         tools=tools_list
     )
 
+    init_agent = INIT_AGENT_TEMPLATE.format(
+        agent_name=agent_name
+    ) 
+
+    init_tools = INIT_TOOLS_TEMPLATE.format(
+        tool_names=tools_list,
+        export_tools=export_tools
+    )
+
     AGENT_CACHE["name"] = agent_name
     AGENT_CACHE["prompt"] = prompt
 
     with open(AGENT_PATH, 'w', encoding='utf-8') as file:
         file.write(agent)
 
+    with open(INIT_TOOLS_PATH, 'w', encoding='utf-8') as file:
+        file.write(init_tools)
+
+    with open(INIT_AGENT_PATH, 'w', encoding='utf-8') as file:
+        file.write(init_agent)
+
     return f"O agente {agent_name} foi criado com as seguintes ferramentas {tools_list}"
 
-TOOL_TEMPLATE = '''
+TOOL_TEMPLATE = ''' 
 def {tool_name}({params}):
     """
     {description}
@@ -91,18 +124,14 @@ def {tool_name}({params}):
     {code}
 '''
 
-class ParamSpec(TypedDict):
-    name: str
-    type_: str
-    description: str
 
-
-def criar_tool(tool_name: str, params: list[ParamSpec ], description: str, code: str, return_doc: str) -> str:
+def criar_tool(tool_name: str, params: list[dict], description: str, code: str, return_doc: str) -> str:
     """
     Gera uma tool no formato do Google ADK com base nas informações fornecidas.
 
     :param tool_name: Nome da função/tool.
-    :param params: Lista de Objetos ParamSpec no formato: 
+    :param params: Lista de objetos no formato:
+        {name: 'nome_do_param', type: 'tipo_do_param', description: 'descrição_do_param'}
     :param description: Descrição geral da função/tool.
     :param code: Código da função/tool em Python.
     :param return_doc: Documentação do retorno da função/tool.
@@ -110,8 +139,8 @@ def criar_tool(tool_name: str, params: list[ParamSpec ], description: str, code:
     :return: String com a definição da função/tool.
     """
 
-    params_str = ", ".join([f"{p['name']}: {p['type_']}" for p in params])
-    params_doc = "\n    ".join([f":param {p['name']}: {p['desc']}" for p in params])
+    params_str = ", ".join([f"{p['name']}: {p['type']}" for p in params])
+    params_doc = "\n    ".join([f":param {p['name']}: {p['description']}" for p in params])
 
     tool_code = TOOL_TEMPLATE.format(
         tool_name=tool_name,
@@ -144,7 +173,7 @@ Role: {role}
 ### Exemplos de uso
 
 ```
-{exemple}
+{example}
 ```
 
 ### System Prompt
