@@ -30,7 +30,7 @@ AGENT_CREATOR_PROMPT = """
     ],
     description="Realiza uma busca avançada por vagas de emprego utilizando o Tavily Search.",
     return_doc="List[dict]: Lista de resultados da pesquisa.",
-    code="return tavily_tool_instance.search()")
+    code="PREENCHA AQUI COM O CÓDIGO DA FUNÇÃO A SER IMPLEMENTADA")
 """
 
 # Crie um agente capaz de acessar o GitHub do usuário, fazer um resumo de seus repositórios e revisar seus pull requests

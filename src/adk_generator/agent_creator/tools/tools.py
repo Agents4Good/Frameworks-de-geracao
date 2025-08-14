@@ -57,9 +57,9 @@ root_agent = Agent(
 '''
 
 INIT_AGENT_TEMPLATE ='''
-from .agent import {agent_name}
+from .agent import root_agent
 
-__all__ = ("{agent_name}")
+__all__ = ("root_agent")
 '''
 
 INIT_TOOLS_TEMPLATE='''
@@ -89,10 +89,6 @@ def criar_agente(agent_name: str, description: str, prompt: str, tools_name: dic
         tools=tools_list
     )
 
-    init_agent = INIT_AGENT_TEMPLATE.format(
-        agent_name=agent_name
-    ) 
-
     init_tools = INIT_TOOLS_TEMPLATE.format(
         tool_names=tools_list,
         export_tools=export_tools
@@ -108,7 +104,7 @@ def criar_agente(agent_name: str, description: str, prompt: str, tools_name: dic
         file.write(init_tools)
 
     with open(INIT_AGENT_PATH, 'w', encoding='utf-8') as file:
-        file.write(init_agent)
+        file.write(INIT_AGENT_TEMPLATE)
 
     return f"O agente {agent_name} foi criado com as seguintes ferramentas {tools_list}"
 
@@ -195,26 +191,28 @@ Modelo utilizado em testes:
 
 ### Tools
 
-{tools_descriprion}
+{tools_description}
 
 ### Testes e validação
 
 Foi utilizado para a realização de testes a biblioteca Deepeval do Python
 """
 
-def criar_documentacao(role: str, example: str, activation_mode: str, tools_description: list[str]) -> str:
+def criar_documentacao(role: str, example: str, activation_mode: str, tools_description: dict) -> str:
     """
     Gera uma documentação estruturada para um agente.
 
     :param role: Descrição do papel/persona do agente.
     :param exemple: Exemplo de uso do agente.
     :param activation_mode: Descrição das condições ou modo de ativação do agente (ex. entrada do usuário).
-    :param tools_description: Lista contendo descrições das ferramentas usadas pelo agente.
+    :param tools_description: Lista contendo descrições das ferramentas usadas pelo agente, no formato:
+        {descriptions: ["tool_description1", "tool_description2"]}
 
     :return: Confirmação que a documentação foi criada.
     """
     agent_name = AGENT_CACHE["name"]
     agent_prompt = AGENT_CACHE["prompt"]
+    descriptions = "\n".join(desc for desc in tools_description['descriptions'])
 
     documentation_code = DOCUMENTATION_TEMPLATE.format(
         agent_name=agent_name,
@@ -222,7 +220,7 @@ def criar_documentacao(role: str, example: str, activation_mode: str, tools_desc
         example=example,
         prompt=agent_prompt,
         activation_mode=activation_mode,
-        tools_description=tools_description
+        tools_description=descriptions
     )
 
     with open(DOCUMENTATION_PATH, "w", encoding="utf-8") as f:
