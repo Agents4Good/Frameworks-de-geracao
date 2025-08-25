@@ -49,10 +49,8 @@ async def execute_graph(input: str) -> str:
             print("Tool calls:", last_msg.tool_calls)
         else:
             print("Nova mensagem:", last_msg.content)
-        print("-=-"*30)
     return "Execução concluída"
 
 
-
-github_response = asyncio.run(execute_graph("Quais são os meus repositórios?"))
-print(github_response)
+if __name__ == "__main__":
+    asyncio.run(execute_graph(input("$ ")))
