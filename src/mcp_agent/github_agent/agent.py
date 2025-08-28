@@ -1,6 +1,6 @@
 from langchain_openai import ChatOpenAI
 from langgraph.graph import MessagesState
-from .tools import client
+from tools import client
 
 model = ChatOpenAI(model="gpt-4o")
 
