@@ -4,7 +4,7 @@ load_dotenv(override=True)
 from langgraph.prebuilt import ToolNode
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langchain_core.messages import HumanMessage
-from .github_agent.agent import mcp_agent, get_tools
+from agent import mcp_agent, get_tools
 import asyncio
 
 
