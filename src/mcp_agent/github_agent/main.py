@@ -3,7 +3,7 @@ load_dotenv(override=True)
 
 from langgraph.prebuilt import ToolNode
 from langgraph.graph import END, START, MessagesState, StateGraph
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from agent import mcp_agent, get_tools
 import asyncio
 
@@ -11,7 +11,7 @@ import asyncio
 def should_continue(state: MessagesState):
     messages = state["messages"]
     last_message = messages[-1]
-    if last_message.tool_calls:
+    if isinstance(last_message, AIMessage) and last_message.tool_calls:
         return "tools"
     return END
 
@@ -37,19 +37,9 @@ async def execute_graph(input: str) -> str:
     initial_state = MessagesState(messages=[HumanMessage(input)])
     graph = await build_graph()
 
-    async for update in graph.astream(initial_state, stream_mode="updates"):
-        _, state = next(iter(update.items()))
-
-        if not state or "messages" not in state:
-            continue
-
-        last_msg = state["messages"][-1]
-
-        if getattr(last_msg, "tool_calls", None):
-            print("Tool calls:", last_msg.tool_calls)
-        else:
-            print("Nova mensagem:", last_msg.content)
-    return "Execução concluída"
+    result_state = await graph.ainvoke(initial_state)
+    print(result_state)
+    return result_state["messages"]
 
 
 if __name__ == "__main__":

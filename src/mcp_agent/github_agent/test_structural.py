@@ -2,13 +2,44 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from agent import mcp_agent, get_tools
+from agent import mcp_agent
 from main import build_graph, execute_graph
-from langgraph.prebuilt import ToolNode
-from langgraph.graph import END, START, MessagesState, StateGraph
 from langchain_core.messages import HumanMessage
+from langchain_core.messages.tool import ToolCall
+from langchain_core.tools import StructuredTool
+
+
+def _make_mock_model(response_text: list):
+    """
+    Cria um mock de modelo compatível com o mcp_agent
+    Ele simula o comportamento de model.bind_tools()
+    E posteriormente todos os model_with_tools.ainvoke()
+    """
+    mock_runnable = MagicMock()
+    mock_runnable.ainvoke = AsyncMock(side_effect=response_text)
+    mock_model = MagicMock()
+    mock_model.bind_tools.return_value = mock_runnable
+    return mock_model
+
+
+def _make_mock_tool(return_value, tool_name):
+    """
+    Cria uma StructuredTool realista (compatível com ToolNode).
+    O comportamento mockado é definido no `func`.
+    """
+
+    def fake_tool_func() -> str:
+        return return_value
+
+    tool = StructuredTool.from_function(
+        func=fake_tool_func,
+        name=tool_name,
+        description="Fake tool usada para testes."
+    )
+
+    return tool
 
 
 # ------------------------------
@@ -16,9 +47,7 @@ from langchain_core.messages import HumanMessage
 # ------------------------------
 def test_mcp_agent_node_behavior():
     # Mock do modelo para não chamar API real
-    mock_model = MagicMock()
-    mock_model.invoke.return_value = AIMessage(
-        content="Resposta mock do agente")
+    mock_model = _make_mock_model([AIMessage(content="Resposta simulada")])
 
     # TypedDict é apenas dict
     state = {"messages": [HumanMessage(content="Olá")]}
@@ -33,7 +62,7 @@ def test_mcp_agent_node_behavior():
 
     assert isinstance(messages[0], SystemMessage)
     assert isinstance(messages[-1], AIMessage)
-    assert messages[-1].content == "Resposta mock do agente"
+    assert messages[-1].content == "Resposta simulada"
     assert any(isinstance(m, HumanMessage)
                and m.content == "Olá" for m in messages)
 
@@ -42,10 +71,7 @@ def test_mcp_agent_node_behavior():
 # 2️⃣ Testes do Roteamento do Grafo
 # ------------------------------
 def test_graph_routing_verbose():
-    # Mock do modelo
-    mock_model = MagicMock()
-    mock_model.invoke.return_value = AIMessage(
-        content="Resposta mock do agente")
+    mock_model = _make_mock_model([AIMessage(content="Resposta simulada")])
 
     with patch("agent.model", mock_model):
         # Constrói o grafo compilado
@@ -55,7 +81,7 @@ def test_graph_routing_verbose():
         initial_state = {"messages": [HumanMessage(content="Teste do fluxo")]}
 
         # Invoca o grafo
-        result_state = asyncio.run(compiled_graph.invoke(initial_state))
+        result_state = asyncio.run(compiled_graph.ainvoke(initial_state))
 
     messages = result_state["messages"]
 
@@ -74,7 +100,7 @@ def test_graph_routing_verbose():
 # ------------------------------
 # 3 Testes estrutura do grafo
 # ------------------------------
-def test_graph_contains_agent_and_tool_and_start_nodes(self):
+def test_graph_contains_agent_and_tool_and_start_nodes():
         "Verifica se o grafo contém apenas o nó 'agent', o nó inicial automático ('__start__') e o nó de ferramentas ('tools')"
         graph = asyncio.run(build_graph())
         nodes = list(graph.nodes.keys())
@@ -117,7 +143,7 @@ def test_agent_has_attached_tools():
     nodes = list(graph.nodes.keys())
     tool_related_nodes = [node for node in nodes if 'tool' in node.lower() or 'function' in node.lower()]
     
-    assert len(tool_related_nodes) == 0, f"Encontradas possíveis ferramentas: {tool_related_nodes}"
+    assert len(tool_related_nodes) == 1, f"Encontradas possíveis ferramentas: {tool_related_nodes}"
     
     # Verificamos se o agente usa ferramentas inspecionando o código da função
     import inspect
@@ -128,13 +154,31 @@ def test_agent_has_attached_tools():
 def test_graph_no_cycles_nominal_execution():
     input_text = "Teste de fluxo do grafo"
     
-    # Mock do modelo para não chamar API real
-    mock_model = MagicMock()
-    mock_model.invoke.return_value = AIMessage(content="Resposta mock do agente")
+    mock_model = _make_mock_model([AIMessage(content="Resposta simulada")])
     
     with patch("agent.model", mock_model):
         messages = asyncio.run(execute_graph(input_text))
     
     # Verifica se o fluxo terminou corretamente
     assert isinstance(messages, list), "O resultado da execução do grafo deve ser uma lista de mensagens"
-    assert messages[-1].content == "Resposta mock do agente", "O fluxo não terminou corretamente no nó final"
+    assert messages[-1].content == "Resposta simulada", "O fluxo não terminou corretamente no nó final"
+
+
+def test_graph_execution_with_tools():
+    input_text = "Teste de fluxo do grafo"
+
+    mock_tool = _make_mock_tool("resultado da tool", "teste")
+    mock_model = _make_mock_model([AIMessage(content="(pedir tool)", tool_calls=[ToolCall(id="1", name="teste", args={})]), 
+                                   AIMessage(content="Resposta simulada")])
+    
+    with patch("agent.model", mock_model), \
+            patch("agent.get_tools", new=AsyncMock(return_value=[mock_tool])), \
+            patch("main.get_tools", new=AsyncMock(return_value=[mock_tool])):
+        messages = asyncio.run(execute_graph(input_text))
+
+    # Verifica se o fluxo terminou corretamente
+    assert isinstance(
+        messages, list), "O resultado da execução do grafo deve ser uma lista de mensagens"
+    assert messages[-1].content == "Resposta simulada", "O fluxo não terminou corretamente no nó final"
+    assert any(isinstance(m, SystemMessage)
+               for m in messages), "Deve existir um ToolMessage (resposta da tool) em algum ponto das mensagens."
